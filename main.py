@@ -10,6 +10,8 @@ from transformers.image_processing_base import ImageProcessorType
 from transformers.modeling_utils import SpecificPreTrainedModelType
 import onnxscript
 
+from onnx_edit import add_static_quantization
+
 
 def get_yolos() -> (SpecificPreTrainedModelType, ImageProcessorType):
     model_url = 'hustvl/yolos-base'
@@ -41,11 +43,14 @@ def check_onnx_model(onnx_file_path):
 
 
 def main():
-    model, dummy_input = get_yolos()
-    print(f"Dummy input shape: {dummy_input.shape}")
+    # model, dummy_input = get_yolos()
+    # print(f"Dummy input shape: {dummy_input.shape}")
+    #
+    # convert_pytorch_to_onnx(model, dummy_input, "out_yolos_model")
 
-    convert_pytorch_to_onnx(model, dummy_input, "out_yolos_model")
-    check_onnx_model("out_yolos_model")
+    onnx_model = onnx.load("out_yolos_model.onnx")
+    add_static_quantization(onnx_model, "out_yolos_model_quant")
+    check_onnx_model("out_yolos_model_quant")
 
 
 if __name__ == "__main__":
