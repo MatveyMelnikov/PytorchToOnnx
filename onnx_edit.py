@@ -11,7 +11,7 @@ scale = np.array([0.01], dtype=np.float32)
 zero_point = np.array([0], dtype=np.int8)
 
 
-def add_quant_and_dequant_to_matmul_node(
+def add_quant_to_matmul_node(
         model_graph: Graph,
         matmul_node: Any
 ):
@@ -26,7 +26,7 @@ def add_quant_and_dequant_to_matmul_node(
         matmul_input_name = matmul_input.name
 
         quant_input = gs.Variable(
-            name=f"{matmul_input_name}_Quant",
+            name=f"{matmul_input_name}_{matmul_node_name}_Quant",
             dtype=np.int8
         )
         quant_node = gs.Node(
@@ -51,7 +51,7 @@ def add_quant_and_dequant_to_matmul_node(
     )
     dequant_node = gs.Node(
         op="DequantizeLinear",
-        name=f"{matmul_node_name}_Dequant_Output",
+        name=f"{matmul_node_name}_Quant_Output",
         inputs=[
             matmul_output,
             gs.Constant(f"{matmul_node_name}_Scale", values=scale),
@@ -63,7 +63,7 @@ def add_quant_and_dequant_to_matmul_node(
     model_graph.nodes.extend([dequant_node])
 
     # Redirect matmul output tensor
-    matmul_node.outputs[0] = dequant_node.inputs[0]
+    # matmul_node.outputs[0] = dequant_node.inputs[0]
 
     # Redirect matmul input for all users of current matmul node
     for out in matmul_node.outputs:
@@ -78,7 +78,8 @@ def add_static_quantization(onnx_model: ModelProto, quant_onnx_filename: str):
     matmul_nodes = [node for node in model_graph.nodes if node.op == "MatMul"]
 
     for matmul_node in matmul_nodes:
-        add_quant_and_dequant_to_matmul_node(model_graph, matmul_node)
+        add_quant_to_matmul_node(model_graph, matmul_node)
 
-    model_graph.cleanup().toposort()
+    model_graph.cleanup()
+    model_graph = model_graph.toposort()
     onnx.save(gs.export_onnx(model_graph), f"{quant_onnx_filename}.onnx")
